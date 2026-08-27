@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dply\QueueInsights;
 
+use Dply\QueueInsights\Transport\DplyConnector;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
@@ -33,10 +34,52 @@ class QueueInsightsServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/queue-insights.php', 'queue-insights');
 
+        $this->registerManagedQueueConnection();
+
         $this->app->singleton(Reporter::class, fn (): Reporter => new Reporter(
             (string) config('queue-insights.endpoint', ''),
             (string) config('queue-insights.token', ''),
         ));
+    }
+
+    /**
+     * Register the `dply` queue connection and its driver.
+     *
+     * NOT the `sqs` driver. dply's endpoint speaks the SQS wire protocol, so
+     * that would work — but it pulls aws/aws-sdk-php into an app that has no
+     * business with Amazon, and the stock `sqs` block reads AWS_ACCESS_KEY_ID,
+     * which most apps also use for S3. Pointing those at dply would break the
+     * filesystem disk to fix the queue.
+     *
+     * The endpoint takes a bearer token as readily as a signature, so the
+     * driver here is plain HTTP: no SDK, no SigV4 signer, no AWS-shaped
+     * variables. Nothing registers unless DPLY_QUEUE_URL is set.
+     */
+    private function registerManagedQueueConnection(): void
+    {
+        $url = trim((string) env('DPLY_QUEUE_URL', ''));
+
+        if ($url === '') {
+            return;
+        }
+
+        // Never clobber a connection the app declared itself.
+        if (! is_array(config('queue.connections.dply'))) {
+            config([
+                'queue.connections.dply' => [
+                    'driver' => 'dply',
+                    'url' => rtrim($url, '/'),
+                    'token' => (string) env('DPLY_QUEUE_TOKEN', ''),
+                    'queue' => (string) env('DPLY_QUEUE_DEFAULT', 'default'),
+                    'retry_after' => (int) env('DPLY_QUEUE_RETRY_AFTER', 90),
+                    'after_commit' => false,
+                ],
+            ]);
+        }
+
+        $this->app->afterResolving('queue', function ($manager): void {
+            $manager->addConnector('dply', fn (): DplyConnector => new DplyConnector);
+        });
     }
 
     public function boot(): void

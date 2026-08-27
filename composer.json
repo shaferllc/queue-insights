@@ -1,11 +1,12 @@
 {
     "name": "dply/queue-insights",
-    "description": "Reports Laravel queue job lifecycle events to dply.",
+    "description": "dply Queue driver and queue job lifecycle reporting for Laravel.",
     "license": "MIT",
     "require": {
         "php": "^8.2",
         "illuminate/support": "^11.0|^12.0|^13.0",
-        "illuminate/queue": "^11.0|^12.0|^13.0"
+        "illuminate/queue": "^11.0|^12.0|^13.0",
+        "illuminate/http": "^11.0|^12.0|^13.0"
     },
     "autoload": {
         "psr-4": {
@@ -19,5 +20,10 @@
             ]
         }
     },
-    "minimum-stability": "stable"
+    "minimum-stability": "stable",
+    "keywords": [
+        "laravel",
+        "queue",
+        "dply"
+    ]
 }

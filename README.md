@@ -8,8 +8,10 @@ observer can see is **execution**: how long a job took, whether it succeeded,
 and what a job class's throughput looks like. A completed job deletes its own
 row, so by the time anything polls, the evidence is gone.
 
-Only the application is present at that moment. That is what this package is
-for, and it is the only thing it does.
+Only the application is present at that moment. That is one of the two things
+this package does.
+
+The other is the **`dply` queue driver** — the client for dply's managed queue.
 
 ## Install
 
@@ -22,7 +24,40 @@ configures an endpoint and token** — with neither set it registers no listener
 at all, so installing it costs a stopped application nothing.
 
 dply installs and configures this for you when queue insights are enabled for a
-site. You do not normally require it by hand.
+site, or when a site is moved onto the managed queue. You do not normally
+require it by hand.
+
+## The `dply` queue driver
+
+Set these and `QUEUE_CONNECTION=dply` resolves. There is no `config/queue.php`
+edit — the package registers the connection when `DPLY_QUEUE_URL` is present:
+
+```dotenv
+QUEUE_CONNECTION=dply
+DPLY_QUEUE_URL=https://dply.io/api/queue/v1
+DPLY_QUEUE_TOKEN=your-token
+```
+
+Optional: `DPLY_QUEUE_DEFAULT` (default queue name, `default`) and
+`DPLY_QUEUE_RETRY_AFTER` (seconds a reserved job stays invisible, `90`).
+
+If your application declares its own `dply` connection, the package leaves it
+alone.
+
+### Why not the `sqs` driver
+
+dply's endpoint speaks the SQS wire protocol, so Laravel's own `sqs` driver
+does talk to it. It costs two things this driver does not:
+
+1. **The AWS SDK.** `aws/aws-sdk-php` becomes a dependency of your application,
+   to reach a service that is not Amazon's.
+2. **Your AWS credentials.** The stock `sqs` connection reads
+   `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` — the same variables your S3
+   disk uses. Pointing those at dply would break your filesystem to fix your
+   queue.
+
+dply's endpoint accepts a bearer token as readily as a request signature, so
+this driver is plain HTTP: no SDK, no signing, no AWS-shaped variables.
 
 ## Configuration
 
