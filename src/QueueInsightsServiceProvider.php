@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dply\QueueInsights;
 
 use Dply\QueueInsights\Transport\DplyConnector;
+use Dply\QueueInsights\Transport\DplyFailedJobProvider;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
@@ -80,6 +81,17 @@ class QueueInsightsServiceProvider extends ServiceProvider
         $this->app->afterResolving('queue', function ($manager): void {
             $manager->addConnector('dply', fn (): DplyConnector => new DplyConnector);
         });
+
+        // Failures follow the jobs — but only when asked. Laravel defaults this
+        // to `database-uuids`, and an app may well depend on its own
+        // failed_jobs table, so QUEUE_FAILED_DRIVER=dply is the opt-in rather
+        // than something the package assumes because a queue moved.
+        if ((string) config('queue.failed.driver', '') === 'dply') {
+            $this->app->singleton('queue.failer', fn (): DplyFailedJobProvider => new DplyFailedJobProvider(
+                rtrim($url, '/'),
+                (string) env('DPLY_QUEUE_TOKEN', ''),
+            ));
+        }
     }
 
     public function boot(): void
